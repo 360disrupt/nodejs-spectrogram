@@ -14,3 +14,6 @@ https://www.oreilly.com/library/view/elegant-scipy/9781491922927/ch04.html
 
 Digital signal processing
 https://dsp.stackexchange.com/
+
+# License
+MIT, see license file
