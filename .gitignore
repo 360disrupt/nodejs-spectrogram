@@ -1,0 +1,10 @@
+.env
+/.idea
+/node_modules
+*plot.png
+/out-json
+/out-draw
+**/audio-in/*
+!**/audio-in/examples
+
+
