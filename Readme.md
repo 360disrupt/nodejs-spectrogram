@@ -1,7 +1,7 @@
 # About
 This tool transforms wav files into spectrograms. Either as a PNG or as a json for further use in tensorflow.
 
-![Example Spectrogram]('./docs/reference.png')
+![Example Spectrogram](./docs/reference.png)
 
 # How to use:
 1. `git clone https://github.com/360disrupt/nodejs-spectrogram.git && cd nodejs-spectrogram`
