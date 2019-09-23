@@ -95,7 +95,9 @@ const processWav = (file, wav) => {
     const outPath = process.env.OUT_FOLDER_JSON + '/' + file.replace('.wav', '.json')
     if (process.env.SAVE) {
         debugWavProcessing(`Saving file to ${outPath}`);
-        fs.writeFile(outPath, JSON.stringify(spectrograph, null, 4), console.log);
+        const stringified = JSON.stringify(spectrograph, null, 4);
+        debugWavVerbose(stringified);
+        fs.writeFile(outPath, stringified, console.log);
     }
     if (process.env.DRAW) {
         drawSpectogram.drawSpectrogram(file, spectrograph)

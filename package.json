@@ -9,8 +9,7 @@
   },
   "nodemonConfig": {
     "ignore": [
-      "out/*",
-      "plots/*"
+      "out*/*"
     ]
   },
   "author": "",
