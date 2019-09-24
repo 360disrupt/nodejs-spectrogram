@@ -19,6 +19,7 @@
     "audio-oscillator": "^3.1.1",
     "byte-data": "^16.0.3",
     "canvas": "^2.6.0",
+    "chokidar": "^3.1.1",
     "debug": "^4.1.1",
     "dotenv": "^8.1.0",
     "everpolate": "0.0.3",

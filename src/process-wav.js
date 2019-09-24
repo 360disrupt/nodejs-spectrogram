@@ -3,7 +3,10 @@ const debugWav = require('debug')('wav');
 const debugWavProcessing = require('debug')('wav:processing');
 const debugWavVerbose = require('debug')('wav:verbose');
 
+const EventEmitter = require('events');
 const fs = require('fs');
+const path = require('path');
+const chokidar = require('chokidar');
 const _ = require('lodash');
 const async = require('async');
 const sine = require('audio-oscillator/sin');
@@ -33,7 +36,7 @@ const generateWav = () => {
  * @return {number}
  */
 const getNumberOfSamples = (wav) => {
-    debugWav('getNumberOfSamples wav.data.samplsequenceses.length', wav.data.samples.length, 'samplesLength', samplesLength)
+    debugWav('getNumberOfSamples wav.data.samples.length', wav.data.samples.length, 'samplesLength', samplesLength, wav)
     return Math.floor(wav.data.samples.length / (samplesLength * (wav.dataType.bits / 8)));
 };
 
@@ -201,6 +204,63 @@ exports.processAudioInFolder = (callback) => {
                 }, next);
             }
         ], callback)
+    });
+};
+
+/**
+ * Reads all files in the audio-in folder and processes them
+ * @param callback
+ */
+exports.watchAudioInFolder = () => {
+    // wait for two files (1st is saved)
+    const counterEmitter = new EventEmitter();
+    let globalCounter = 0;
+    chokidar.watch(process.env.AUDIO_IN_FOLDER).on('add', (filePath) => {
+        debugWavProcessing('chokidar', filePath);
+        if (filePath.match(/.*\.wav/)) {
+            const fileName = path.basename(filePath);
+
+            globalCounter++;
+            const counter = globalCounter;
+            counterEmitter.emit('counterEvent', globalCounter);
+
+            counterEmitter.once('counterEvent', (counterEvent) => {
+                if (counter < counterEvent) {
+                    debugWavProcessing('Processing filePath', filePath);
+                    async.waterfall([
+                        (next) => {
+                            readWav(fileName, next)
+                        },
+                        (fileName, wavFile, next) => {
+                            const options = {};
+                            if (process.env.CROP_MAX) {
+                                debugWavProcessing("Crop samples to", process.env.CROP_MAX);
+                                options.maxSamples = process.env.CROP_MAX;
+                                getMaxSamples([fileName], (err, maxSamples) => {
+                                    if (err) { return next(err); }
+                                    else if (maxSamples < process.env.CROP_MAX) {
+                                        debugWavProcessing('Skipping file to few samples', maxSamples,  '<', process.env.CROP_MAX);
+                                        return next(null);
+                                    } else {
+                                        processWav(fileName, wavFile, options, next)
+                                    }
+                                });
+                            } else {
+                                processWav(fileName, wavFile, options, next)
+                            }
+                        }
+                    ], (err) => {
+                        if (err) {
+                            throw new Error(err);
+                        } else {
+                            fs.unlink(filePath, console.error)
+                        }
+                    });
+                }
+            });
+
+
+        }
     });
 };
 

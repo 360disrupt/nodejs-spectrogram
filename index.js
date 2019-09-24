@@ -5,8 +5,10 @@ const processWav = require('./src/process-wav');
  */
 if (process.env.GENERATE === 'true') {
     processWav.processGeneratedWav();
+} else if (process.env.WATCH) {
+    processWav.watchAudioInFolder();
 } else {
-    processWav.processAudioInFolder( (err) => {
+    processWav.processAudioInFolder((err) => {
         if (err) {
             throw new Error(err);
         } else {
