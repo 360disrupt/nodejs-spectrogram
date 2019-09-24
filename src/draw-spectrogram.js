@@ -19,8 +19,8 @@ if (process.env.OUT_FOLDER_DRAW) {
  * @param fileName
  * @param spectrograph: in array form
  */
-exports.drawSpectrogram = (fileName, spectrograph) => {
-    debugWavProcessing('drawing canvas')
+exports.drawSpectrogram = (fileName, spectrograph, callback) => {
+    debugWavProcessing('drawing canvas');
     const strokeHeight = 1;
     const canvasHeight = spectrograph[0].length * strokeHeight;
     const canvasWidth = spectrograph.length;
@@ -50,5 +50,9 @@ exports.drawSpectrogram = (fileName, spectrograph) => {
     const out = fs.createWriteStream(outPath);
     const stream = canvas.createPNGStream();
     stream.pipe(out);
-    out.on('finish', () => console.log('The PNG file was created.'));
+    out.on('finish', (err) => {
+        if (err) { return callback(err);}
+        debugWavProcessing('The PNG file was created.')
+        callback(null);
+    });
 };

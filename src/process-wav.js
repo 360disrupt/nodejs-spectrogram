@@ -4,6 +4,7 @@ const debugWavProcessing = require('debug')('wav:processing');
 const debugWavVerbose = require('debug')('wav:verbose');
 
 const fs = require('fs');
+const _ = require('lodash');
 const async = require('async');
 const sine = require('audio-oscillator/sin');
 const WaveFile = require('wavefile');
@@ -77,10 +78,15 @@ const readWav = (file, callback) => {
     })
 };
 
-const processWav = (file, wav) => {
+const processWav = (fileName, wav, options, callback) => {
     let index = 0;
-    const maxIndex = getNumberOfSamples(wav) - 1;
-    debugWav(`Wav has ${maxIndex} sequences with ${samplesLength}`);
+    let maxIndex;
+    if (options.maxSamples) {
+        maxIndex = options.maxSamples
+    } else {
+        maxIndex = getNumberOfSamples(wav) - 1;
+    }
+    debugWav(`Wav has ${maxIndex} sequences with ${samplesLength} samples ${getNumberOfSamples(wav) - 1}`);
     const spectrograph = [];
 
     do {
@@ -92,16 +98,27 @@ const processWav = (file, wav) => {
         spectrograph.push(snapshot);
     } while (index < maxIndex);
 
-    const outPath = process.env.OUT_FOLDER_JSON + '/' + file.replace('.wav', '.json')
-    if (process.env.SAVE) {
-        debugWavProcessing(`Saving file to ${outPath}`);
-        const stringified = JSON.stringify(spectrograph, null, 4);
-        debugWavVerbose(stringified);
-        fs.writeFile(outPath, stringified, console.log);
-    }
-    if (process.env.DRAW) {
-        drawSpectogram.drawSpectrogram(file, spectrograph)
-    }
+    const outPath = process.env.OUT_FOLDER_JSON + '/' + fileName.replace('.wav', '.json')
+    async.series([
+        (next) => {
+            if (process.env.SAVE === 'true') {
+                debugWavProcessing(`Saving file to ${outPath} shape`, spectrograph.length, spectrograph[0].length);
+                const stringified = JSON.stringify(spectrograph, null, 4);
+                debugWavVerbose(stringified);
+                fs.writeFile(outPath, stringified, next);
+            } else {
+                next();
+            }
+        },
+        (next) => {
+            if (process.env.DRAW === 'true') {
+                debugWavProcessing(`DRAW file to ${outPath} shape`, spectrograph.length, spectrograph[0].length);
+                drawSpectogram.drawSpectrogram(fileName, spectrograph, next)
+            } else {
+                next();
+            }
+        }
+    ], callback);
 };
 
 /**
@@ -110,6 +127,45 @@ const processWav = (file, wav) => {
 exports.processGeneratedWav = () => {
     const samples = generateWav();
     analyze.spectro(samples);
+};
+
+/**
+ * Crops all files to the minimum samples of the smallest file to get equal tensors
+ * @param callback
+ * @return {*}
+ */
+const getMaxSamples = (files, callback) => {
+    if (process.env.CROP !== 'true') {
+        return callback(null, null)
+    }
+    async.waterfall([
+        (next) => { // order files by size
+            const fileSizes = [];
+            async.each(files, (fileName, next) => {
+                const filePath = process.env.AUDIO_IN_FOLDER + '/' + fileName;
+                fs.stat(filePath, (err, stats) => {
+                    if (err) { return next(err); }
+                    fileSizes.push({fileName: fileName, size: stats.size})
+                    return next();
+                });
+            }, (err) => {
+                if (err) { return next(err); }
+                const minSize = _.minBy(fileSizes, (file) => file.size);
+                const mean = _.meanBy(fileSizes, (file) => file.size);
+                debugWavProcessing(fileSizes);
+                debugWavProcessing('Min file size is',  minSize.fileName, 'size',  minSize.size, 'mean is', mean, 'ratio', minSize.size/mean * 100);
+                return next(null, minSize.fileName);
+            });
+        },
+        (minSizeFileName, next) => {
+            debugWavProcessing('minSizeFileName', minSizeFileName);
+            readWav(minSizeFileName, (err, fileName, wav) => {
+                if (err) { return next(err);}
+                const maxSamples = getNumberOfSamples(wav) - 1;
+                debugWavProcessing('Max Samples', maxSamples);
+                return next(null, maxSamples);
+            });
+        }], callback);
 };
 
 /**
@@ -125,12 +181,26 @@ exports.processAudioInFolder = (callback) => {
         }
         files = files.filter(file => file.match(/.*\.wav/));
         debugWavProcessing('Processing files', files);
-        async.each(files, (file, next) => {
-            async.waterfall([
-                (next) => readWav(file, next),
-                processWav
-            ], next);
-        }, callback);
+
+        async.waterfall([
+            (next) => {
+                getMaxSamples(files, next)
+            },
+            (maxSamples, next) => {
+                async.eachSeries(files, (fileName, next) => {
+                    async.waterfall([
+                        (next) => readWav(fileName, next),
+                        (fileName, wavFile, next) => {
+                            const options = {};
+                            if (process.env.CROP === 'true') {
+                                options.maxSamples = maxSamples;
+                            }
+                            processWav(fileName, wavFile, options, next)
+                        }
+                    ], next);
+                }, next);
+            }
+        ], callback)
     });
 };
 
