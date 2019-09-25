@@ -14,6 +14,7 @@ const WaveFile = require('wavefile');
 const {unpackArray} = require('byte-data');
 
 const analyze = require('./analyze');
+const sendHelper = require('./helper/send.helper');
 const drawSpectogram = require('./draw-spectrogram');
 
 const BYTE = 8;
@@ -90,7 +91,7 @@ const processWav = (fileName, wav, options, callback) => {
         maxIndex = getNumberOfSamples(wav) - 1;
     }
     debugWav(`Wav has ${maxIndex} sequences with ${samplesLength} samples ${getNumberOfSamples(wav) - 1}`);
-    const spectrograph = [];
+    const spectrogram = [];
 
     do {
         debugWavVerbose(`Seq ${index + 1}`);
@@ -98,15 +99,24 @@ const processWav = (fileName, wav, options, callback) => {
         index++;
         // console.table(samples)
         const snapshot = analyze.spectro(samples);
-        spectrograph.push(snapshot);
+        spectrogram.push(snapshot);
     } while (index < maxIndex);
 
     const outPath = process.env.OUT_FOLDER_JSON + '/' + fileName.replace('.wav', '.json')
     async.series([
         (next) => {
+            if (process.env.SEND === 'true' && process.env.SEND_URL) {
+                debugWavProcessing(`Sending file to ${process.env.SEND_URL} shape`, spectrogram.length, spectrogram[0].length);
+                const url =`${process.env.SEND_URL}/spectrogram`;
+                sendHelper.requestPost(url, {spectrogram}, next);
+            } else {
+                next();
+            }
+        },
+        (next) => {
             if (process.env.SAVE === 'true') {
-                debugWavProcessing(`Saving file to ${outPath} shape`, spectrograph.length, spectrograph[0].length);
-                const stringified = JSON.stringify(spectrograph, null, 4);
+                debugWavProcessing(`Saving file to ${outPath} shape`, spectrogram.length, spectrogram[0].length);
+                const stringified = JSON.stringify(spectrogram, null, 4);
                 debugWavVerbose(stringified);
                 fs.writeFile(outPath, stringified, next);
             } else {
@@ -115,8 +125,8 @@ const processWav = (fileName, wav, options, callback) => {
         },
         (next) => {
             if (process.env.DRAW === 'true') {
-                debugWavProcessing(`DRAW file to ${outPath} shape`, spectrograph.length, spectrograph[0].length);
-                drawSpectogram.drawSpectrogram(fileName, spectrograph, next)
+                debugWavProcessing(`DRAW file to ${outPath} shape`, spectrogram.length, spectrogram[0].length);
+                drawSpectogram.drawSpectrogram(fileName, spectrogram, next)
             } else {
                 next();
             }

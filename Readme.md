@@ -18,6 +18,8 @@ You need to follow the instructions of the package [`canvas`](https://github.com
 - OUT_FOLDER_DRAW: {string} the folder for the png spectrogram
 - GENERATE: {boolean}, use a dummy sine wav (for testing purposes)
 - DRAW: {boolean} create a png
+- SEND: {boolean} send spectrograms via http
+- SEND_URL: {string} url to send spectrograms to
 - RESOLUTION: {number, root of 2} how many samples are in one sequence
 - CROP: {boolean} crop files to the smallest file to have the same sequence length
 - CROP_MAX: {number} crop files to a max of sequences
